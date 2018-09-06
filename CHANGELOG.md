@@ -1,3 +1,47 @@
+## 0.11.1 (September 6th, 2018)
+
+SECURITY:
+
+ * Random Byte Reading in Barrier: Prior to this release, Vault was not
+   properly checking the error code when reading random bytes for the IV for
+   AES operations in its cryptographic barrier. Specifically, this means that
+   such an IV could potentially be zero multiple times, causing nonce re-use
+   and weakening the security of the key. On most platforms this should never
+   happen because reading from kernel random sources is non-blocking and always
+   successful, but there may be platform-specific behavior that has not been
+   accounted for. (Vault has tests to check exactly this, and the tests have
+   never seen nonce re-use.)
+
+FEATURES:
+
+ * AliCloud Agent Support: Vault Agent can now authenticate against the
+   AliCloud auth method.
+ * UI: Enable AliCloud auth method and Azure secrets engine via the UI.
+
+IMPROVEMENTS:
+
+ * core: Logging level for most logs (not including secrets/auth plugins) can
+   now be changed on-the-fly via `SIGHUP`, reading the desired value from
+   Vault's config file [GH-5280]
+
+BUG FIXES:
+
+ * core: Ensure we use a background context when stepping down [GH-5290]
+ * core: Properly check error return from random byte reading [GH-5277]
+ * core: Re-add `sys/` top-route injection for now [GH-5241]
+ * core: Properly store the replication checkpoint file if it's larger than the
+   storage engine's per-item limit
+ * identity: Update MemDB with identity group alias while loading groups [GH-5289]
+ * secrets/database: Fix nil pointer when revoking some leases [GH-5262]
+ * secrets/pki: Fix sign-verbatim losing extra Subject attributes [GH-5245]
+ * secrets/pki: Remove certificates from store when tidying revoked
+   certificates and simplify API [GH-5231]
+ * ui: JSON editor will not coerce input to an object, and will now show an 
+   error about Vault expecting an object [GH-5271]
+ * ui: authentication form will now default to any methods that have been tuned
+   to show up for unauthenticated users [GH-5281]
+ 
+
 ## 0.11.0 (August 28th, 2018)
 
 DEPRECATIONS/CHANGES:
@@ -5,7 +49,9 @@ DEPRECATIONS/CHANGES:
  * Request Timeouts: A default request timeout of 90s is now enforced. This
    setting can be overwritten in the config file. If you anticipate requests
    taking longer than 90s this setting should be updated before upgrading.
- * `sys/` Top Level Injection: For the last two years for backwards
+ * (NOTE: will be re-added into 0.11.1 as it broke more than anticipated. There
+   will be some further guidelines around when this will be removed again.)
+   * `sys/` Top Level Injection: For the last two years for backwards
    compatibility data for various `sys/` routes has been injected into both the
    Secret's Data map and into the top level of the JSON response object.
    However, this has some subtle issues that pop up from time to time and is
