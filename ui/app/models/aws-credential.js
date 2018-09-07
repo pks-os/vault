@@ -3,7 +3,6 @@ import Ember from 'ember';
 import { expandAttributeMeta } from 'vault/utils/field-to-attrs';
 const { attr } = DS;
 const { computed } = Ember;
-const CREATE_FIELDS = ['credentialType', 'ttl', 'roleArn'];
 const CREDENTIAL_TYPES = [
   {
     value: 'iam_user',
