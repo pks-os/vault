@@ -1114,9 +1114,24 @@ func (c *Core) newLogicalBackend(ctx context.Context, entry *MountEntry, sysView
 	if alias, ok := mountAliases[t]; ok {
 		t = alias
 	}
-	f, ok := c.logicalBackends[t]
+	b, err := c.retrieveBackend(ctx, entry, sysView, view, "plugin")
+	if err != nil {
+		// Not found as a plugin, try as a builtin.
+		b, err = c.retrieveBackend(ctx, entry, sysView, view, t)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if b == nil {
+		return nil, fmt.Errorf("nil backend of type %q returned from factory", t)
+	}
+	return b, nil
+}
+
+func (c *Core) retrieveBackend(ctx context.Context, entry *MountEntry, sysView logical.SystemView, view logical.Storage, logicalBackendKey string) (logical.Backend, error) {
+	f, ok := c.logicalBackends[logicalBackendKey]
 	if !ok {
-		return nil, fmt.Errorf("unknown backend type: %q", t)
+		return nil, fmt.Errorf("unknown backend type: %q", logicalBackendKey)
 	}
 
 	// Set up conf to pass in plugin_name
@@ -1124,11 +1139,11 @@ func (c *Core) newLogicalBackend(ctx context.Context, entry *MountEntry, sysView
 	for k, v := range entry.Options {
 		conf[k] = v
 	}
-	if entry.Config.PluginName != "" {
-		conf["plugin_name"] = entry.Config.PluginName
+	if logicalBackendKey == "plugin" {
+		conf["plugin_name"] = entry.Type
 	}
 
-	backendLogger := c.baseLogger.Named(fmt.Sprintf("secrets.%s.%s", t, entry.Accessor))
+	backendLogger := c.baseLogger.Named(fmt.Sprintf("secrets.%s.%s", logicalBackendKey, entry.Accessor))
 	c.AddLogger(backendLogger)
 	config := &logical.BackendConfig{
 		StorageView: view,
@@ -1137,15 +1152,7 @@ func (c *Core) newLogicalBackend(ctx context.Context, entry *MountEntry, sysView
 		System:      sysView,
 		BackendUUID: entry.BackendAwareUUID,
 	}
-
-	b, err := f(ctx, config)
-	if err != nil {
-		return nil, err
-	}
-	if b == nil {
-		return nil, fmt.Errorf("nil backend of type %q returned from factory", t)
-	}
-	return b, nil
+	return f(ctx, config)
 }
 
 // mountEntrySysView creates a logical.SystemView from global and
