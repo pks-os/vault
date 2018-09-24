@@ -711,9 +711,23 @@ func (c *Core) newCredentialBackend(ctx context.Context, entry *MountEntry, sysV
 		t = alias
 	}
 
-	f, ok := c.credentialBackends[t]
+	// First, search for a plugin of this entry's type.
+	b, err := c.retrieveAuthBackend(ctx, entry, sysView, view, "plugin")
+	if err != nil {
+		// If not found, search for a builtin of this entry's type.
+		b, err = c.retrieveAuthBackend(ctx, entry, sysView, view, t)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return b, nil
+}
+
+func (c *Core) retrieveAuthBackend(ctx context.Context, entry *MountEntry, sysView logical.SystemView, view logical.Storage, credentialBackendKey string) (logical.Backend, error) {
+	f, ok := c.credentialBackends[credentialBackendKey]
 	if !ok {
-		return nil, fmt.Errorf("unknown backend type: %q", t)
+		return nil, fmt.Errorf("unknown backend type: %q", credentialBackendKey)
 	}
 
 	// Set up conf to pass in plugin_name
@@ -721,11 +735,11 @@ func (c *Core) newCredentialBackend(ctx context.Context, entry *MountEntry, sysV
 	for k, v := range entry.Options {
 		conf[k] = v
 	}
-	if entry.Config.PluginName != "" {
-		conf["plugin_name"] = entry.Config.PluginName
+	if credentialBackendKey == "plugin" {
+		conf["plugin_name"] = entry.Type
 	}
 
-	authLogger := c.baseLogger.Named(fmt.Sprintf("auth.%s.%s", t, entry.Accessor))
+	authLogger := c.baseLogger.Named(fmt.Sprintf("auth.%s.%s", credentialBackendKey, entry.Accessor))
 	c.AddLogger(authLogger)
 	config := &logical.BackendConfig{
 		StorageView: view,
@@ -734,13 +748,7 @@ func (c *Core) newCredentialBackend(ctx context.Context, entry *MountEntry, sysV
 		System:      sysView,
 		BackendUUID: entry.BackendAwareUUID,
 	}
-
-	b, err := f(ctx, config)
-	if err != nil {
-		return nil, err
-	}
-
-	return b, nil
+	return f(ctx, config)
 }
 
 // defaultAuthTable creates a default auth table

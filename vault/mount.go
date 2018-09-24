@@ -1114,10 +1114,12 @@ func (c *Core) newLogicalBackend(ctx context.Context, entry *MountEntry, sysView
 	if alias, ok := mountAliases[t]; ok {
 		t = alias
 	}
-	b, err := c.retrieveBackend(ctx, entry, sysView, view, "plugin")
+
+	// First, search for a plugin of this entry's type.
+	b, err := c.retrieveSecretBackend(ctx, entry, sysView, view, "plugin")
 	if err != nil {
-		// Not found as a plugin, try as a builtin.
-		b, err = c.retrieveBackend(ctx, entry, sysView, view, t)
+		// If not found, search for a builtin of this entry's type.
+		b, err = c.retrieveSecretBackend(ctx, entry, sysView, view, t)
 		if err != nil {
 			return nil, err
 		}
@@ -1128,7 +1130,7 @@ func (c *Core) newLogicalBackend(ctx context.Context, entry *MountEntry, sysView
 	return b, nil
 }
 
-func (c *Core) retrieveBackend(ctx context.Context, entry *MountEntry, sysView logical.SystemView, view logical.Storage, logicalBackendKey string) (logical.Backend, error) {
+func (c *Core) retrieveSecretBackend(ctx context.Context, entry *MountEntry, sysView logical.SystemView, view logical.Storage, logicalBackendKey string) (logical.Backend, error) {
 	f, ok := c.logicalBackends[logicalBackendKey]
 	if !ok {
 		return nil, fmt.Errorf("unknown backend type: %q", logicalBackendKey)
